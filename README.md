@@ -27,6 +27,29 @@ flowchart LR
 
 Go to **Actions → Build Windows Binaries → Run workflow** and optionally specify a version.
 
+## Installation
+
+### Scoop (recommended)
+
+```powershell
+scoop bucket add latipun7 https://github.com/latipun7/scoop-bucket
+scoop install latipun7/fortune-mod
+```
+
+Then just run `fortune` from anywhere:
+
+```powershell
+fortune          # random quote
+fortune -s       # short only
+fortune -l       # long only
+fortune -a       # all databases (including offensive)
+fortune -o       # offensive only
+```
+
+### Manual
+
+Download the ZIP from [Releases](https://github.com/latipun7/fortune-mod-windows-builder/releases), extract, then use `.\fortune.cmd` or add `bin\` to PATH.
+
 ## What's Included
 
 | File | Description |
@@ -38,31 +61,6 @@ Go to **Actions → Build Windows Binaries → Run workflow** and optionally spe
 | `bin/*.dll` | MinGW runtime DLLs (libsystre, libtre, libiconv, libintl) |
 | `share/games/fortunes/*` | All fortune cookie databases |
 | `fortune.cmd` | Quick launcher (cd to package root + run fortune) |
-
-## Usage
-
-```powershell
-# Option 1: Use the launcher (recommended)
-.\fortune.cmd
-.\fortune.cmd -s      # short only
-.\fortune.cmd -o      # offensive fortunes
-
-# Option 2: Run directly (must cd to package root first)
-cd path\to\fortune-mod-windows-x64
-.\bin\fortune.exe
-.\bin\fortune.exe -a      # all databases
-.\bin\fortune.exe -l      # long only
-```
-
-## Adding to PATH
-
-```powershell
-# Add to current session
-$env:PATH += ";C:\path\to\fortune-mod-windows-x64\bin"
-
-# Add permanently (user-level)
-[Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";C:\path\to\fortune-mod-windows-x64\bin", "User")
-```
 
 ## Upstream
 
