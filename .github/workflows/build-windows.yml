@@ -115,9 +115,11 @@ jobs:
           perl -MCPAN -e 'CPAN::Shell->notest("install", "Path::Tiny")' 2>/dev/null \
             || (curl -L https://cpanmin.us | perl - --notest Path::Tiny)
 
-      - name: Clone fortune-mod at release tag
+      - name: Clone fortune-mod (master branch)
         run: |
-          git clone --depth 1 --recurse-submodules --branch "${{ env.TAG }}" \
+          # Use master branch instead of release tag — includes Windows path
+          # fix from commit 48999f3 (issue #127) not yet in any release.
+          git clone --depth 1 --recurse-submodules \
             "https://github.com/${{ env.UPSTREAM_REPO }}.git" fortune-mod-src
 
       - name: Pre-generate rules-of-acquisition
@@ -140,10 +142,10 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DWITH_TEST_SUITE=OFF \
             -DUSE_WIN32_REGEX_LIBS=ON \
-            -DCOOKIEDIR="./share/games/fortunes" \
-            -DOCOOKIEDIR="./share/games/fortunes/off" \
-            -DLOCALDIR="./share/games/fortunes" \
-            -DLOCALODIR="./share/games/fortunes/off"
+            -DCOOKIEDIR="share/games/fortunes" \
+            -DOCOOKIEDIR="share/games/fortunes/off" \
+            -DLOCALDIR="share/games/fortunes" \
+            -DLOCALODIR="share/games/fortunes/off"
 
           # Build only the binaries and data we need (skip man page generation
           # which requires App::Docmake + full docbook toolchain)
@@ -230,11 +232,11 @@ jobs:
           cp fortune-mod-src/README.asciidoc "${OUT}/doc/" 2>/dev/null || true
 
           # Create a simple launcher script
-          # fortune.exe's built-in opendir doesn't resolve relative paths
-          # correctly on Windows. Pass the absolute fortune dir as argument.
+          # cd to package root so fortune.exe finds data via relative COOKIEDIR.
           cat > "${OUT}/fortune.cmd" << 'CMDEOF'
           @echo off
-          "%~dp0bin\fortune.exe" "%~dp0share\games\fortunes" %*
+          cd /d "%~dp0"
+          "%~dp0bin\fortune.exe" %*
           CMDEOF
 
           # Create a README for the package
