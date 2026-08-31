@@ -200,7 +200,7 @@ jobs:
               dll_name=$(echo "$line" | awk '{print $1}')
               # Skip Windows system DLLs (case-insensitive)
               case "$dll_name" in
-                [Kk][Ee][Rr][Nn]*|[Mm][Ss][Vv]*|[Uu][Ss][Ee][Rr]*|[Gg][Dd][Ii]*|[Aa][Dd][Vv]*|[Ss][Hh][Ee][Ll]*|[Ww][Ss][Oo]*|[Ww][Ii][Nn]*) continue ;;
+                [Kk][Ee][Rr][Nn]*|[Mm][Ss][Vv]*|[Uu][Ss][Ee][Rr]*|[Gg][Dd][Ii]*|[Aa][Dd][Vv]*|[Ss][Hh][Ee][Ll]*|[Ww][Ss][Oo]*|[Ww][Ii][Nn]*|ntdll*|NTDLL*|RPCRT*|rpcrt*|sechost*|SEC*|ucrt*|UCRT*|api-ms*|API-MS*) continue ;;
               esac
               if [ -f "$dll_path" ] && [ ! -f "${OUT}/dll/${dll_name}" ]; then
                 cp "$dll_path" "${OUT}/dll/" 2>/dev/null || true
