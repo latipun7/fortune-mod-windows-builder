@@ -194,27 +194,23 @@ jobs:
           cp "${INSTALL}/bin/unstr.exe"     "${OUT}/bin/"
           cp "${INSTALL}/bin/rot.exe"       "${OUT}/bin/"
 
-          # Bundle MinGW runtime DLLs required by the binaries
-          # fortune.exe links against libsystre-0.dll (regex) and MinGW runtime
-          mkdir -p "${OUT}/dll"
+          # Bundle MinGW runtime DLLs alongside the binaries
+          # On Windows, DLLs must be in the same directory as the .exe
           for exe in "${OUT}/bin/"*.exe; do
-            # Get DLL dependencies, filter for non-system DLLs
             ldd "$exe" 2>/dev/null | while read -r line; do
               dll_path=$(echo "$line" | awk '{print $3}')
               dll_name=$(echo "$line" | awk '{print $1}')
-              # Skip Windows system DLLs (case-insensitive)
               case "$dll_name" in
                 [Kk][Ee][Rr][Nn]*|[Mm][Ss][Vv]*|[Uu][Ss][Ee][Rr]*|[Gg][Dd][Ii]*|[Aa][Dd][Vv]*|[Ss][Hh][Ee][Ll]*|[Ww][Ss][Oo]*|[Ww][Ii][Nn]*|ntdll*|NTDLL*|RPCRT*|rpcrt*|sechost*|SEC*|ucrt*|UCRT*|api-ms*|API-MS*) continue ;;
               esac
-              if [ -f "$dll_path" ] && [ ! -f "${OUT}/dll/${dll_name}" ]; then
-                cp "$dll_path" "${OUT}/dll/" 2>/dev/null || true
+              if [ -f "$dll_path" ] && [ ! -f "${OUT}/bin/${dll_name}" ]; then
+                cp "$dll_path" "${OUT}/bin/" 2>/dev/null || true
               fi
             done
           done
 
-          # List bundled DLLs for debugging
           echo "=== Bundled DLLs ==="
-          ls -la "${OUT}/dll/" 2>/dev/null || echo "(none)"
+          ls "${OUT}/bin/"*.dll 2>/dev/null || echo "(none)"
 
           # Fortune data files
           if [ -d "${INSTALL}/share/games/fortunes" ]; then
@@ -239,7 +235,6 @@ jobs:
           cat > "${OUT}/fortune.cmd" << 'CMDEOF'
           @echo off
           cd /d "%~dp0"
-          set "PATH=%~dp0dll;%PATH%"
           "%~dp0bin\fortune.exe" %*
           CMDEOF
 
