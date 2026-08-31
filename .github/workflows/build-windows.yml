@@ -140,7 +140,9 @@ jobs:
             -DWITH_TEST_SUITE=OFF \
             -DUSE_WIN32_REGEX_LIBS=ON
 
-          mingw32-make -j$(nproc)
+          # Build only the binaries and data we need (skip man page generation
+          # which requires App::Docmake + full docbook toolchain)
+          mingw32-make fortune strfile unstr rot plain_cookies offensive_cookies -j$(nproc)
           mingw32-make install
 
       - name: Collect binaries and data
