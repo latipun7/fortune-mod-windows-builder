@@ -142,10 +142,10 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DWITH_TEST_SUITE=OFF \
             -DUSE_WIN32_REGEX_LIBS=ON \
-            -DCOOKIEDIR="share/games/fortunes" \
-            -DOCOOKIEDIR="share/games/fortunes/off" \
-            -DLOCALDIR="share/games/fortunes" \
-            -DLOCALODIR="share/games/fortunes/off"
+            -DCOOKIEDIR="./share/games/fortunes" \
+            -DOCOOKIEDIR="./share/games/fortunes/off" \
+            -DLOCALDIR="./share/games/fortunes" \
+            -DLOCALODIR="./share/games/fortunes/off"
 
           # Build only the binaries and data we need (skip man page generation
           # which requires App::Docmake + full docbook toolchain)
