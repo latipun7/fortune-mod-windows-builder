@@ -102,10 +102,14 @@ jobs:
             mingw-w64-x86_64-recode
             mingw-w64-x86_64-libsystre
             mingw-w64-x86_64-pcre2
-            mingw-w64-x86_64-perl-path-tiny
+            mingw-w64-x86_64-perl
             git
             tar
             xz
+
+      - name: Install Perl dependencies
+        run: |
+          cpan Path::Tiny
 
       - name: Clone fortune-mod at release tag
         run: |
