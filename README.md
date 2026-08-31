@@ -10,8 +10,8 @@ fortune-mod releases only include source tarballs. Arch Linux, macOS (Homebrew),
 
 ```mermaid
 flowchart LR
-    A[Upstream Release<br/>shlomif/fortune-mod] -->|Daily check| B{New version?}
-    B -->|Yes| C[Build on<br/>windows-latest]
+    A[shlomif/fortune-mod<br/>master branch] -->|Daily check| B{New release?}
+    B -->|Yes| C[Build from master<br/>on windows-latest]
     C --> D[Package ZIP]
     D --> E[GitHub Release<br/>with binaries]
     B -->|No| F[Skip]
@@ -19,8 +19,8 @@ flowchart LR
 
 1. **Daily cron** checks `shlomif/fortune-mod` for new releases
 2. If a new tag is found (pattern: `fortune-mod-X.Y.Z`), triggers the build
-3. Builds using MSYS2/MinGW64 toolchain on GitHub Actions
-4. Packages `fortune.exe`, `strfile.exe`, `unstr.exe`, `rot.exe` + all fortune data files
+3. Builds from **master branch** using MSYS2/MinGW64 on GitHub Actions (includes Windows path fixes not yet in any release)
+4. Packages `fortune.exe`, `strfile.exe`, `unstr.exe`, `rot.exe` + all fortune data files + required DLLs
 5. Publishes a GitHub Release with the ZIP
 
 ## Manual Trigger
@@ -35,17 +35,22 @@ Go to **Actions → Build Windows Binaries → Run workflow** and optionally spe
 | `bin/strfile.exe` | Create .dat index files for fortune databases |
 | `bin/unstr.exe` | Reverse strfile |
 | `bin/rot.exe` | Rot13 filter |
+| `bin/*.dll` | MinGW runtime DLLs (libsystre, libtre, libiconv, libintl) |
 | `share/games/fortunes/*` | All fortune cookie databases |
-| `fortune.cmd` | Quick launcher |
+| `fortune.cmd` | Quick launcher (cd to package root + run fortune) |
 
 ## Usage
 
 ```powershell
-# Download from Releases, extract, then:
+# Option 1: Use the launcher (recommended)
+.\fortune.cmd
+.\fortune.cmd -s      # short only
+.\fortune.cmd -o      # offensive fortunes
+
+# Option 2: Run directly (must cd to package root first)
+cd path\to\fortune-mod-windows-x64
 .\bin\fortune.exe
 .\bin\fortune.exe -a      # all databases
-.\bin\fortune.exe -o      # offensive fortunes
-.\bin\fortune.exe -s      # short only
 .\bin\fortune.exe -l      # long only
 ```
 
@@ -61,7 +66,7 @@ $env:PATH += ";C:\path\to\fortune-mod-windows-x64\bin"
 
 ## Upstream
 
-All credit goes to [Shlomi Fish](https://www.shlomifish.org/) and contributors. This repo only builds — it does not modify the source.
+All credit goes to [Shlomi Fish](https://www.shlomifish.org/) and contributors. This repo builds from the upstream master branch with a relative `COOKIEDIR` so fortune finds its data files on any machine.
 
 ## License
 
