@@ -143,7 +143,38 @@ jobs:
           # Build only the binaries and data we need (skip man page generation
           # which requires App::Docmake + full docbook toolchain)
           mingw32-make fortune strfile unstr rot plain_cookies offensive_cookies -j$(nproc)
-          mingw32-make install
+
+      - name: Install manually
+        run: |
+          INSTALL="${{ github.workspace }}/install"
+          BUILD="fortune-mod-src/fortune-mod/build"
+          SRC="fortune-mod-src/fortune-mod"
+
+          mkdir -p "${INSTALL}/games" "${INSTALL}/bin" "${INSTALL}/share/games/fortunes"
+
+          # Binaries
+          cp "${BUILD}/fortune.exe" "${INSTALL}/games/"
+          cp "${BUILD}/strfile.exe" "${INSTALL}/bin/"
+          cp "${BUILD}/unstr.exe"   "${INSTALL}/bin/"
+          cp "${BUILD}/rot.exe"     "${INSTALL}/bin/"
+
+          # Fortune data files (plain + .dat + offensive)
+          cd "${BUILD}/datfiles"
+          for f in *.dat; do
+            [ -f "$f" ] && cp "$f" "${INSTALL}/share/games/fortunes/"
+          done
+          # Copy the raw cookie files and .u8 symlinks
+          for f in $(ls *.u8 2>/dev/null); do
+            [ -f "$f" ] && cp "$f" "${INSTALL}/share/games/fortunes/"
+          done
+          # Copy offensive data
+          if [ -d "${BUILD}/datfiles/off" ]; then
+            mkdir -p "${INSTALL}/share/games/fortunes/off"
+            cd "${BUILD}/datfiles/off"
+            for f in *.dat *.u8; do
+              [ -f "$f" ] && cp "$f" "${INSTALL}/share/games/fortunes/off/"
+            done
+          fi
 
       - name: Collect binaries and data
         run: |
