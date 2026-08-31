@@ -102,6 +102,7 @@ jobs:
             mingw-w64-x86_64-recode
             mingw-w64-x86_64-libsystre
             mingw-w64-x86_64-pcre2
+            mingw-w64-x86_64-perl-path-tiny
             git
             tar
             xz
