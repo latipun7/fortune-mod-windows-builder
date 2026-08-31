@@ -139,7 +139,11 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
             -DWITH_TEST_SUITE=OFF \
-            -DUSE_WIN32_REGEX_LIBS=ON
+            -DUSE_WIN32_REGEX_LIBS=ON \
+            -DCOOKIEDIR="share/games/fortunes" \
+            -DOCOOKIEDIR="share/games/fortunes/off" \
+            -DLOCALDIR="share/games/fortunes" \
+            -DLOCALODIR="share/games/fortunes/off"
 
           # Build only the binaries and data we need (skip man page generation
           # which requires App::Docmake + full docbook toolchain)
@@ -230,8 +234,11 @@ jobs:
           cp fortune-mod-src/README.asciidoc "${OUT}/doc/" 2>/dev/null || true
 
           # Create a simple launcher script
+          # COOKIEDIR is compiled as relative "share/games/fortunes", so we
+          # must cd to the package root before running fortune.exe.
           cat > "${OUT}/fortune.cmd" << 'CMDEOF'
           @echo off
+          cd /d "%~dp0"
           set "PATH=%~dp0dll;%PATH%"
           "%~dp0bin\fortune.exe" %*
           CMDEOF
