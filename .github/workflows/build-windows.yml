@@ -191,18 +191,20 @@ jobs:
           cp "${INSTALL}/bin/rot.exe"       "${OUT}/bin/"
 
           # Bundle MinGW runtime DLLs required by the binaries
-          # Find all non-system DLLs needed (skip Windows system DLLs)
+          # fortune.exe links against libsystre-0.dll (regex) and MinGW runtime
           mkdir -p "${OUT}/dll"
           for exe in "${OUT}/bin/"*.exe; do
-            ldd "$exe" 2>/dev/null | grep -i mingw | awk '{print $3}' | while read dll; do
-              [ -f "$dll" ] && cp -n "$dll" "${OUT}/dll/" 2>/dev/null || true
-            done
-          done
-          # Also check the DLLs themselves for transitive deps
-          for dll in "${OUT}/dll/"*.dll; do
-            [ -f "$dll" ] || continue
-            ldd "$dll" 2>/dev/null | grep -i mingw | awk '{print $3}' | while read dep; do
-              [ -f "$dep" ] && cp -n "$dep" "${OUT}/dll/" 2>/dev/null || true
+            # Get DLL dependencies, filter for non-system DLLs
+            ldd "$exe" 2>/dev/null | while read -r line; do
+              dll_path=$(echo "$line" | awk '{print $3}')
+              dll_name=$(echo "$line" | awk '{print $1}')
+              # Skip Windows system DLLs (case-insensitive)
+              case "$dll_name" in
+                [Kk][Ee][Rr][Nn]*|[Mm][Ss][Vv]*|[Uu][Ss][Ee][Rr]*|[Gg][Dd][Ii]*|[Aa][Dd][Vv]*|[Ss][Hh][Ee][Ll]*|[Ww][Ss][Oo]*|[Ww][Ii][Nn]*) continue ;;
+              esac
+              if [ -f "$dll_path" ] && [ ! -f "${OUT}/dll/${dll_name}" ]; then
+                cp "$dll_path" "${OUT}/dll/" 2>/dev/null || true
+              fi
             done
           done
 
