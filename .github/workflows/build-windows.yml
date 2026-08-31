@@ -230,12 +230,11 @@ jobs:
           cp fortune-mod-src/README.asciidoc "${OUT}/doc/" 2>/dev/null || true
 
           # Create a simple launcher script
-          # COOKIEDIR is compiled as relative "share/games/fortunes", so we
-          # must cd to the package root before running fortune.exe.
+          # fortune.exe's built-in opendir doesn't resolve relative paths
+          # correctly on Windows. Pass the absolute fortune dir as argument.
           cat > "${OUT}/fortune.cmd" << 'CMDEOF'
           @echo off
-          cd /d "%~dp0"
-          "%~dp0bin\fortune.exe" %*
+          "%~dp0bin\fortune.exe" "%~dp0share\games\fortunes" %*
           CMDEOF
 
           # Create a README for the package
