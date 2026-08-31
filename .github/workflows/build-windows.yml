@@ -109,7 +109,10 @@ jobs:
 
       - name: Install Perl dependencies
         run: |
-          cpan Path::Tiny
+          # Path::Tiny is needed for man page generation scripts.
+          # Try MSYS2 Perl first, fall back to cpanm.
+          perl -MCPAN -e 'CPAN::Shell->notest("install", "Path::Tiny")' 2>/dev/null \
+            || (curl -L https://cpanmin.us | perl - --notest Path::Tiny)
 
       - name: Clone fortune-mod at release tag
         run: |
