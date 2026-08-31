@@ -1,0 +1,269 @@
+name: Build Windows Binaries
+
+on:
+  # Check upstream for new releases daily at 03:00 UTC
+  schedule:
+    - cron: '0 3 * * *'
+
+  # Manual trigger with optional version override
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'fortune-mod version to build (e.g. 3.26.0). Leave empty for latest.'
+        required: false
+        type: string
+
+env:
+  UPSTREAM_REPO: shlomif/fortune-mod
+  UPSTREAM_TAG_PREFIX: fortune-mod-
+
+permissions:
+  contents: write
+
+jobs:
+  check-release:
+    name: Check for new upstream release
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check upstream for new release
+        id: check
+        run: |
+          # If manually triggered with a version, use that
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="${{ env.UPSTREAM_TAG_PREFIX }}${VERSION}"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "Manual trigger: building version ${VERSION}"
+            exit 0
+          fi
+
+          # Fetch latest release from upstream
+          LATEST=$(curl -sL "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/latest" | jq -r '.tag_name // empty')
+
+          if [ -z "$LATEST" ]; then
+            echo "Could not fetch upstream release"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          VERSION="${LATEST#${{ env.UPSTREAM_TAG_PREFIX }}}"
+          TAG="${{ env.UPSTREAM_TAG_PREFIX }}${VERSION}"
+
+          # Check if we already have a release for this version
+          EXISTING=$(curl -sL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${TAG}" \
+            | jq -r '.tag_name // empty')
+
+          if [ "$EXISTING" = "$TAG" ]; then
+            echo "Release ${TAG} already exists, skipping"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New upstream release: ${TAG}"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-windows:
+    name: Build Windows x64 binaries
+    needs: check-release
+    if: needs.check-release.outputs.should_build == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      VERSION: ${{ needs.check-release.outputs.version }}
+      TAG: ${{ needs.check-release.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-recode
+            mingw-w64-x86_64-libsystre
+            mingw-w64-x86_64-pcre2
+            git
+            tar
+            xz
+
+      - name: Clone fortune-mod at release tag
+        run: |
+          git clone --depth 1 --recurse-submodules --branch "${{ env.TAG }}" \
+            "https://github.com/${{ env.UPSTREAM_REPO }}.git" fortune-mod-src
+
+      - name: Build fortune-mod
+        run: |
+          cd fortune-mod-src/fortune-mod
+          mkdir -p build && cd build
+
+          cmake .. \
+            -G "MinGW Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
+            -DWITH_TEST_SUITE=OFF \
+            -DUSE_WIN32_REGEX_LIBS=ON
+
+          mingw32-make -j$(nproc)
+          mingw32-make install
+
+      - name: Collect binaries and data
+        run: |
+          OUT="${{ github.workspace }}/package"
+          mkdir -p "${OUT}/bin" "${OUT}/share/games/fortunes" "${OUT}/doc"
+
+          INSTALL="${{ github.workspace }}/install"
+
+          # Binaries
+          cp "${INSTALL}/games/fortune.exe" "${OUT}/bin/"
+          cp "${INSTALL}/bin/strfile.exe"   "${OUT}/bin/"
+          cp "${INSTALL}/bin/unstr.exe"     "${OUT}/bin/"
+          cp "${INSTALL}/bin/rot.exe"       "${OUT}/bin/"
+
+          # Fortune data files
+          if [ -d "${INSTALL}/share/games/fortunes" ]; then
+            cp -r "${INSTALL}/share/games/fortunes/"* "${OUT}/share/games/fortunes/"
+          fi
+
+          # Copy source datfiles as fallback (in case install didn't include them)
+          SRC_DAT="fortune-mod-src/fortune-mod/datfiles"
+          if [ -d "${SRC_DAT}" ]; then
+            for f in "${SRC_DAT}"/*; do
+              [ -f "$f" ] && cp -n "$f" "${OUT}/share/games/fortunes/" 2>/dev/null || true
+            done
+          fi
+
+          # License and readme
+          cp fortune-mod-src/LICENSE "${OUT}/doc/" 2>/dev/null || true
+          cp fortune-mod-src/README.asciidoc "${OUT}/doc/" 2>/dev/null || true
+
+          # Create a simple launcher script
+          cat > "${OUT}/fortune.cmd" << 'CMDEOF'
+          @echo off
+          "%~dp0bin\fortune.exe" %*
+          CMDEOF
+
+          # Create a README for the package
+          cat > "${OUT}/README-Windows.txt" << 'READMEEOF'
+          fortune-mod for Windows
+          ========================
+
+          This is a pre-built Windows binary of fortune-mod.
+
+          Usage:
+            bin\fortune.exe              Show a random fortune
+            bin\fortune.exe -a           Show from all databases
+            bin\fortune.exe -o           Show offensive fortunes
+            bin\fortune.exe -l           Show only long fortunes
+            bin\fortune.exe -s           Show only short fortunes
+
+          Fortune data files are in: share\games\fortunes\
+
+          Source: https://github.com/shlomif/fortune-mod
+          Build:  https://github.com/${{ github.repository }}
+          READMEEOF
+
+      - name: Create ZIP package
+        run: |
+          cd "${{ github.workspace }}/package"
+          zip -r "${{ github.workspace }}/fortune-mod-${{ env.VERSION }}-windows-x64.zip" .
+
+      - name: Build NSIS installer
+        id: nsis
+        continue-on-error: true
+        shell: msys2 {0}
+        run: |
+          # Try to build NSIS installer via CPack
+          cd fortune-mod-src/fortune-mod/build
+          cpack -G NSIS 2>&1 || echo "NSIS_BUILD_FAILED=1" > /tmp/nsis_status
+          if [ -f /tmp/nsis_status ]; then
+            echo "nsis_failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "nsis_failed=false" >> "$GITHUB_OUTPUT"
+            # Move the installer to workspace
+            cp *.exe "${{ github.workspace }}/" 2>/dev/null || true
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fortune-mod-windows-x64
+          path: |
+            ${{ github.workspace }}/fortune-mod-${{ env.VERSION }}-windows-x64.zip
+            ${{ github.workspace }}/fortune-mod-*.exe
+          retention-days: 5
+
+  release:
+    name: Create GitHub Release
+    needs: [check-release, build-windows]
+    if: needs.check-release.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check-release.outputs.version }}
+      TAG: ${{ needs.check-release.outputs.tag }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: fortune-mod-windows-x64
+          path: ./artifacts
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          # Fetch upstream release notes
+          NOTES=$(curl -sL \
+            "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/tags/${{ env.TAG }}" \
+            | jq -r '.body // "No release notes from upstream."')
+
+          HEADER="## fortune-mod ${VERSION} — Windows Binaries
+
+          Pre-built Windows x64 binaries of [fortune-mod](https://github.com/shlomif/fortune-mod).
+
+          ### Contents
+          - \`fortune-mod-${VERSION}-windows-x64.zip\` — Portable ZIP (no install needed)
+
+          ### Quick Start
+          \`\`\`
+          # Extract and run
+          unzip fortune-mod-${VERSION}-windows-x64.zip
+          cd fortune-mod-${VERSION}-windows-x64
+          bin\\fortune.exe
+          \`\`\`
+
+          ### Upstream Release Notes
+          "
+
+          # Write to file (handles special chars safely)
+          echo "${HEADER}" > /tmp/release_notes.md
+          echo "${NOTES}" >> /tmp/release_notes.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "fortune-mod ${{ env.VERSION }} (Windows)"
+          body_path: /tmp/release_notes.md
+          files: ./artifacts/*
+          draft: false
+          prerelease: false
+          generate_release_notes: false
